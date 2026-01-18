@@ -1,9 +1,6 @@
 #!/usr/bin/env node
 import { Server } from "@modelcontextprotocol/sdk/server/index.js";
-import {
-  CallToolRequestSchema,
-  ListToolsRequestSchema,
-} from "@modelcontextprotocol/sdk/types.js";
+import { CallToolRequestSchema, ListToolsRequestSchema } from "@modelcontextprotocol/sdk/types.js";
 import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
 
 const server = new Server({
@@ -41,80 +38,44 @@ server.setRequestHandler(ListToolsRequestSchema, async () => {
 });
 
 server.setRequestHandler(CallToolRequestSchema, async (request) => {
-  if (request.params.name !== "push") {
-    return {
-      content: [
-        {
-          type: "text",
-          text: `Unknown tool: ${request.params.name}`,
-        },
-      ],
-      isError: true,
-    };
-  }
-
   const { filename, contents } = request.params.arguments;
 
-  if (!filename || !contents) {
-    return {
-      content: [
-        {
-          type: "text",
-          text: "Missing required parameters: filename and contents",
-        },
-      ],
-      isError: true,
-    };
-  }
-
-  try {
-    const response = await fetch(
-      "https://gmcode-hook.almagestfraternite.workers.dev",
-      {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          filename,
-          contents,
-        }),
-      }
-    );
-
-    const data = await response.json();
-
-    if (!response.ok) {
-      return {
-        content: [
-          {
-            type: "text",
-            text: `Error from gmcode-hook: ${response.status} ${JSON.stringify(data)}`,
-          },
-        ],
-        isError: true,
-      };
+  const response = await fetch(
+    "https://gmcode-hook.almagestfraternite.workers.dev",
+    {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        filename,
+        contents,
+      }),
     }
+  );
 
+  const data = await response.json();
+
+  if (!response.ok) {
     return {
       content: [
         {
           type: "text",
-          text: JSON.stringify(data, null, 2),
-        },
-      ],
-    };
-  } catch (error) {
-    return {
-      content: [
-        {
-          type: "text",
-          text: `Error: ${error.message}`,
+          text: `Error: ${response.status}`,
         },
       ],
       isError: true,
     };
   }
+
+  return {
+    content: [
+      {
+        type: "text",
+        text: JSON.stringify(data, null, 2),
+      },
+    ],
+  };
 });
 
 async function main() {
