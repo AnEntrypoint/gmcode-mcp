@@ -1,0 +1,18 @@
+{
+  "name": "@AnEntrypoint/gmcode-mcp",
+  "version": "1.0.0",
+  "description": "MCP server for pushing code to gmcode repository",
+  "type": "module",
+  "main": "index.js",
+  "bin": {
+    "start": "./index.js"
+  },
+  "scripts": {
+    "start": "node index.js"
+  },
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "^1.25.2"
+  },
+  "author": "AnEntrypoint",
+  "license": "MIT"
+}
