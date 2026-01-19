@@ -10,6 +10,8 @@ import { tmpdir } from "os";
 const REPO_URL = "https://github.com/AnEntrypoint/gmcode.git";
 const REPO_PATH = `${tmpdir()}/gmcode-push-${Date.now()}`;
 const CODE_FOLDER = "code/discoveries";
+const OWNER = "AnEntrypoint";
+const REPO = "gmcode";
 
 function gitExec(cmd, cwd = REPO_PATH) {
   try {
@@ -17,6 +19,42 @@ function gitExec(cmd, cwd = REPO_PATH) {
   } catch (e) {
     throw new Error(`Git error: ${e.message}`);
   }
+}
+
+async function createPullRequest(token, branchName, filename) {
+  const title = `Add code discovery: ${filename}`;
+  const body = "Code discovery submission via gmcode-mcp";
+
+  const response = await fetch(`https://api.github.com/repos/${OWNER}/${REPO}/pulls`, {
+    method: "POST",
+    headers: {
+      "Authorization": `Bearer ${token}`,
+      "Content-Type": "application/json",
+      "User-Agent": "gmcode-mcp/1.0",
+    },
+    body: JSON.stringify({
+      title,
+      body,
+      head: branchName,
+      base: "main",
+    }),
+  });
+
+  if (!response.ok) {
+    const error = await response.text();
+    throw new Error(`Failed to create PR: ${response.status} ${error}`);
+  }
+
+  const data = await response.json();
+  return {
+    success: true,
+    method: "pull_request",
+    prNumber: data.number,
+    prUrl: data.html_url,
+    filename,
+    branch: branchName,
+    path: `${CODE_FOLDER}/${filename}`,
+  };
 }
 
 async function pushToGitHub(filename, contents) {
@@ -49,17 +87,30 @@ async function pushToGitHub(filename, contents) {
 
     gitExec(`git add ${CODE_FOLDER}/${filename}`);
     gitExec(`git commit -m "Add code discovery: ${filename}"`);
-    gitExec(`git push origin main`);
 
-    const sha = gitExec(`git rev-parse HEAD`).trim();
+    try {
+      gitExec(`git push origin main`);
 
-    return {
-      success: true,
-      sha,
-      filename,
-      path: `${CODE_FOLDER}/${filename}`,
-      url: `https://github.com/AnEntrypoint/gmcode/blob/main/${CODE_FOLDER}/${filename}`,
-    };
+      const sha = gitExec(`git rev-parse HEAD`).trim();
+
+      return {
+        success: true,
+        method: "direct_push",
+        sha,
+        filename,
+        path: `${CODE_FOLDER}/${filename}`,
+        url: `https://github.com/AnEntrypoint/gmcode/blob/main/${CODE_FOLDER}/${filename}`,
+      };
+    } catch (pushError) {
+      const timestamp = Date.now();
+      const branchName = `gmcode/discoveries/${timestamp}`;
+
+      gitExec(`git checkout -b ${branchName}`);
+      gitExec(`git push origin ${branchName}`);
+
+      const prResult = await createPullRequest(token, branchName, filename);
+      return prResult;
+    }
   } finally {
     if (existsSync(REPO_PATH)) {
       rmSync(REPO_PATH, { recursive: true, force: true });
